@@ -173,4 +173,77 @@ test.describe("react-router-serve", () => {
       });
     }
   });
+  test.describe("TRUST_PROXY", () => {
+    for (const templateName of templateNames) {
+      test.describe(`template: ${templateName}`, () => {
+        let fixture: Fixture;
+
+        test.beforeAll(async () => {
+          fixture = await createFixture({
+            templateName,
+            useReactRouterServe: true,
+            files: {
+              "app/routes/_index.tsx": js`
+                import { useLoaderData } from "react-router";
+
+                export function loader({ request }) {
+                  return new URL(request.url).origin;
+                }
+
+                export function action() {
+                  return null;
+                }
+
+                export default function Index() {
+                  return <p>{"origin=" + useLoaderData()}</p>;
+                }
+              `,
+            },
+          });
+        });
+
+        // A proxy that terminates TLS forwards plain HTTP and reports the scheme
+        let behindProxy = (appFixture: AppFixture, method = "GET") =>
+          fetch(`${appFixture.serverUrl}/?index`, {
+            method,
+            headers: {
+              Origin: appFixture.serverUrl.replace("http:", "https:"),
+              "X-Forwarded-Proto": "https",
+            },
+          });
+
+        test("uses the forwarded protocol when the proxy is trusted", async () => {
+          let appFixture = await createAppFixture({
+            ...fixture,
+            reactRouterServeEnv: { TRUST_PROXY: "1" },
+          });
+          try {
+            let document = await behindProxy(appFixture);
+            expect(await document.text()).toContain(
+              `origin=${appFixture.serverUrl.replace("http:", "https:")}</p>`,
+            );
+            expect((await behindProxy(appFixture, "POST")).status).toBe(200);
+          } finally {
+            appFixture.close();
+          }
+        });
+
+        test("ignores forwarded headers by default", async () => {
+          let appFixture = await createAppFixture({
+            ...fixture,
+            reactRouterServeEnv: { TRUST_PROXY: "" },
+          });
+          try {
+            let document = await behindProxy(appFixture);
+            expect(await document.text()).toContain(
+              `origin=${appFixture.serverUrl}</p>`,
+            );
+            expect((await behindProxy(appFixture, "POST")).status).toBe(400);
+          } finally {
+            appFixture.close();
+          }
+        });
+      });
+    }
+  });
 });

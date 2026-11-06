@@ -81,6 +81,8 @@ The first header value is used if it is `http` or `https` (case-insensitive, wit
 Dev and preview servers are not production servers and should not be publicly accessible. Configure your reverse proxy to overwrite client-supplied `X-Forwarded-Proto` headers.
 </docs-warning>
 
+In production, `react-router-serve` uses forwarded headers only when you set [`TRUST_PROXY`](./serve#trust_proxy-environment-variable).
+
 ## `react-router reveal`
 
 React Router handles the entry points of your application by default.

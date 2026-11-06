@@ -294,7 +294,7 @@ export async function createFixture(init: FixtureInit, mode?: ServerMode) {
  * It also means that sometimes the CLI is skipped over in those tests, missing out on code paths that should be tested.
  */
 export async function createAppFixture(
-  fixture: Fixture,
+  fixture: Fixture & { reactRouterServeEnv?: Record<string, string> },
   mode?: ServerMode,
   appPort?: number,
 ) {
@@ -312,6 +312,7 @@ export async function createAppFixture(
           "build/server/index.js",
         ],
         env: {
+          ...fixture.reactRouterServeEnv,
           NODE_ENV: mode || "production",
           PORT: port.toFixed(0),
         },

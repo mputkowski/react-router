@@ -69,6 +69,15 @@ function parseNumber(raw?: string) {
   return maybe;
 }
 
+// Maps the env var to a value of Express's `trust proxy` setting
+function parseTrustProxy(raw?: string) {
+  let value = raw?.trim();
+  if (!value || value.toLowerCase() === "false") return false;
+  if (value.toLowerCase() === "true") return true;
+  if (/^\d+$/.test(value)) return Number(value);
+  return value;
+}
+
 async function getAvailablePort(
   preferredPort: number,
   host?: string,
@@ -133,6 +142,8 @@ async function run() {
     parseNumber(process.env.PORT) ??
     (await getAvailablePort(3000, process.env.HOST));
 
+  let trustProxy = parseTrustProxy(process.env.TRUST_PROXY);
+
   let buildPathArg = process.argv[2];
 
   if (!buildPathArg) {
@@ -191,6 +202,7 @@ async function run() {
 
   let app = express();
   app.disable("x-powered-by");
+  app.set("trust proxy", trustProxy);
 
   if (!isRSCBuild) {
     // `compression` may resolve to Express 4 types from transitive deps while
@@ -219,7 +231,18 @@ async function run() {
 
   if (build.fetch) {
     // RSC
-    app.all("/{*splat}", createRequestListener(build.fetch));
+    let rscFetch = build.fetch;
+    app.all(
+      "/{*splat}",
+      trustProxy === false
+        ? createRequestListener(rscFetch)
+        : (req, res) =>
+            // Use the protocol and host Express resolved under `trust proxy`
+            createRequestListener(rscFetch, {
+              protocol: `${req.protocol}:`,
+              host: req.host,
+            })(req, res),
+    );
   } else if (buildModule.unstable_apiOnly === true) {
     // API Only
     let serverBuild = build as ServerBuild;

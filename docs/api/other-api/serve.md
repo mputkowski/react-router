@@ -6,7 +6,7 @@ title: "@react-router/serve"
 
 React Router is designed for you to own your server, but if you don't want to set one up, you can use the React Router App Server instead. It's a production-ready but basic Node.js server built with [Express][express].
 
-By design, we do not provide options to customize the React Router App Server because if you need to customize the underlying `express` server, we'd rather you manage the server completely instead of creating an abstraction to handle all the possible customizations you may require. If you find you want to customize it, you can [migrate to the `@react-router/express` adapter][migrate-to-express].
+By design, the React Router App Server has no options beyond the environment variables below, because if you need to customize the underlying `express` server, we'd rather you manage the server completely instead of creating an abstraction to handle all the possible customizations you may require. If you find you want to customize it, you can [migrate to the `@react-router/express` adapter][migrate-to-express].
 
 You can see the underlying `express` server configuration in [packages/react-router-serve/cli.ts][rr-serve-code]. By default, it uses the following Express middlewares (please refer to their documentation for default behaviors):
 
@@ -45,6 +45,21 @@ You can change the port of the server with an environment variable.
 ```shellscript nonumber
 PORT=4000 npx react-router-serve build/index.js
 ```
+
+## `TRUST_PROXY` environment variable
+
+When a reverse proxy in front of your server terminates TLS, the server receives plain HTTP, so `request.url` uses `http:` and same-origin action submissions fail origin validation. Set `TRUST_PROXY` so the server builds `request.url` from the `X-Forwarded-Proto` and `X-Forwarded-Host` headers your proxy sets. The value is passed to Express's [`trust proxy`][express-trust-proxy] setting:
+
+- `true`, or a number of hops such as `1`, trusts the proxy that connects to your server
+- a comma-separated list of IP addresses or subnets, or `loopback`, `linklocal` or `uniquelocal`, trusts it only when it connects from one of those addresses
+
+```shellscript nonumber
+TRUST_PROXY=1 npx react-router-serve build/server/index.js
+```
+
+When it is unset, empty or `false`, forwarded headers are ignored.
+
+<docs-warning>Only enable this when a proxy you control overwrites the `X-Forwarded-*` headers and clients cannot reach your server directly. The first value of each header is used, so a proxy that appends to a client-supplied header lets that client choose the protocol and host of `request.url`.</docs-warning>
 
 ## Development Environment
 
@@ -104,6 +119,7 @@ In production, this doesn't happen. The server boots up, and that's the end of i
 [serve-static]: https://expressjs.com/en/resources/middleware/serve-static.html
 [morgan]: https://expressjs.com/en/resources/middleware/morgan.html
 [express]: https://expressjs.com
+[express-trust-proxy]: https://expressjs.com/en/guide/behind-proxies.html
 [migrate-to-express]: ./adapter#migrating-from-the-react-router-app-server
 [pm2-dev]: https://npm.im/pm2-dev
 [nodemon]: https://npm.im/nodemon
